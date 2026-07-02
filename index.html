@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JNV Smart Agri-Tech</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8; margin: 0; padding: 20px; text-align: center; color: #333;">
+
+    <div style="background-color: #2e7d32; color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h1 style="margin: 0; font-size: 28px;">KAUSHAL BODH: SMART IRRIGATION SYSTEM</h1>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">Jawahar Navodaya Vidyalaya Samiti Project</p>
+    </div>
+
+    <div style="background: white; padding: 20px; border-radius: 12px; display: inline-block; width: 80%; max-width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px;">
+        <h3 style="margin: 0; color: #555;">Current Moisture</h3>
+        <div id="live-moisture" style="font-size: 48px; font-weight: bold; color: #1976d2; margin: 10px 0;">--%</div>
+        <small id="last-sync" style="color: #888;">Waiting for ESP32...</small>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 30px; align-items: center; max-width: 800px; margin: 0 auto;">
+        
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <h3 style="margin-top: 0; color: #2e7d32; text-align: left;">🕒 Last 15 Minutes Graph</h3>
+            <canvas id="shortTermChart" style="max-height: 250px;"></canvas>
+        </div>
+
+        <div style="background: white; padding: 20px; border-radius: 12px; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <h3 style="margin-top: 0; color: #37474f; text-align: left;">📊 All-Time Historical Log</h3>
+            <canvas id="allTimeChart" style="max-height: 250px;"></canvas>
+        </div>
+
+    </div>
+
+    <script>
+        // Initializing the Chart configurations
+        const ctx1 = document.getElementById('shortTermChart').getContext('2d');
+        const ctx2 = document.getElementById('allTimeChart').getContext('2d');
+
+        const shortTermChart = new Chart(ctx1, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Moisture %', data: [], borderColor: '#1976d2', tension: 0.3, fill: true, backgroundColor: 'rgba(25, 118, 210, 0.1)' }] }
+        });
+
+        const allTimeChart = new Chart(ctx2, {
+            type: 'bar',
+            data: { labels: [], datasets: [{ label: 'Moisture Log', data: [], backgroundColor: '#2e7d32' }] }
+        });
+
+        async function updateDashboard() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+
+                if(data.length === 0) return;
+
+                // Update Live Card
+                const latest = data[data.length - 1];
+                document.getElementById('live-moisture').innerText = latest.moisture + "%";
+                document.getElementById('last-sync').innerText = "Last sync: " + latest.timestamp;
+
+                // 1. Process All-Time Data
+                const allLabels = data.map(item => item.timestamp);
+                const allValues = data.map(item => item.moisture);
+                allTimeChart.data.labels = allLabels;
+                allTimeChart.data.datasets[0].data = allValues;
+                allTimeChart.update();
+
+                // 2. Process Last 15 Mins (Assuming your ESP32 drops data frequently, slice last few points)
+                // If ESP32 updates every 1 minute, take the last 15 array elements
+                const calculationSlice = data.slice(-15); 
+                shortTermChart.data.labels = calculationSlice.map(item => item.timestamp);
+                shortTermChart.data.datasets[0].data = calculationSlice.map(item => item.moisture);
+                shortTermChart.update();
+
+            } catch (err) {
+                console.error("Error fetching data:", err);
+            }
+        }
+
+        // Fetch new data every 5 seconds dynamically
+        setInterval(updateDashboard, 5000);
+        updateDashboard();
+    </script>
+</body>
+</html>
